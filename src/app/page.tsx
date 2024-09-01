@@ -56,7 +56,9 @@ export default function Home() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">ルネサンス東京 制覇マップ</h1>
+      <h1 className="text-3xl font-bold mb-6">
+        chaspy ルネサンス東京 制覇マップ
+      </h1>
       {showAlert && (
         <div
           className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4"
