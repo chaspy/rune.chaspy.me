@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
+import { MapComponent } from './MapComponent'
 
-const locations = [
+const tokyoLocations = [
   { name: '青砥24', lat: 35.747797, lon: 139.857486 },
   { name: '亀戸24', lat: 35.697399, lon: 139.820022 },
   { name: '北砂', lat: 35.684191, lon: 139.825219 },
@@ -26,6 +27,19 @@ const locations = [
   { name: 'KSC金町24', lat: 35.768141, lon: 139.871325 },
 ]
 
+const saitamaLocations = [
+  { name: '浦和24', lat: 35.879795610942224, lon: 139.64011593495226 },
+  { name: '蕨24', lat: 35.82305596578032, lon: 139.6932897637855 },
+  { name: '吉川', lat: 35.88764707068135, lon: 139.84236030981833 },
+  { name: '新所沢', lat: 35.81196958288052, lon: 139.4622548669497 },
+  { name: 'ふじみ野', lat: 35.856335208341235, lon: 139.52263084790678 },
+  { name: '北朝霞24', lat: 35.81584457322143, lon: 139.5875918725021 },
+  { name: '北戸田24', lat: 35.825488755301386, lon: 139.66065498283058 },
+  { name: '春日部', lat: 35.983684568053036, lon: 139.75117300982268 },
+  { name: '吉川美南', lat: 35.86610725773631, lon: 139.85942716139976 },
+  { name: 'ふじみ野24', lat: 35.88073040793992, lon: 139.52218996298268 },
+]
+
 const visitedLocations = [
   '三軒茶屋24',
   '経堂',
@@ -35,15 +49,18 @@ const visitedLocations = [
   '富士見台24',
   '光が丘',
   '東久留米24',
+  '浦和24',
 ]
 
 export default function Home() {
   const [visited, setVisited] = useState<{ [key: string]: boolean }>(
     Object.fromEntries(
-      locations.map((loc) => [loc.name, visitedLocations.includes(loc.name)])
+      [...tokyoLocations, ...saitamaLocations].map((loc) => [
+        loc.name,
+        visitedLocations.includes(loc.name),
+      ])
     )
   )
-  const [activeLocation, setActiveLocation] = useState<string | null>(null)
   const [showAlert, setShowAlert] = useState(false)
   const [filterVisited, setFilterVisited] = useState<
     'all' | 'visited' | 'not-visited'
@@ -55,64 +72,43 @@ export default function Home() {
     setTimeout(() => setShowAlert(false), 3000)
   }, [])
 
-  const filteredLocations = useMemo(() => {
-    return locations.filter((location) => {
-      if (filterVisited === 'all') return true
-      if (filterVisited === 'visited') return visited[location.name]
-      return !visited[location.name]
-    })
-  }, [visited, filterVisited])
+  const allLocations = [...tokyoLocations, ...saitamaLocations]
 
-  const visitedCount = useMemo(
-    () => Object.values(visited).filter(Boolean).length,
+  const calculateProgress = useCallback(
+    (locations: typeof tokyoLocations) => {
+      const visitedCount = locations.filter((loc) => visited[loc.name]).length
+      const totalCount = locations.length
+      const progressPercentage = (visitedCount / totalCount) * 100
+      return { visitedCount, totalCount, progressPercentage }
+    },
     [visited]
   )
-  const progress = useMemo(
-    () => (visitedCount / locations.length) * 100,
-    [visitedCount]
+
+  const tokyoProgress = useMemo(
+    () => calculateProgress(tokyoLocations),
+    [calculateProgress]
+  )
+  const saitamaProgress = useMemo(
+    () => calculateProgress(saitamaLocations),
+    [calculateProgress]
+  )
+  const totalProgress = useMemo(
+    () => calculateProgress(allLocations),
+    [calculateProgress, allLocations]
   )
 
-  // 緯度経度の範囲を計算
-  const bounds = useMemo(() => {
-    return locations.reduce(
-      (acc, loc) => ({
-        minLat: Math.min(acc.minLat, loc.lat),
-        maxLat: Math.max(acc.maxLat, loc.lat),
-        minLon: Math.min(acc.minLon, loc.lon),
-        maxLon: Math.max(acc.maxLon, loc.lon),
-      }),
-      {
-        minLat: Infinity,
-        maxLat: -Infinity,
-        minLon: Infinity,
-        maxLon: -Infinity,
-      }
-    )
-  }, [])
-
-  // SVG座標に変換する関数（マージンを調整）
-  const toSVGCoords = useCallback(
-    (lat: number, lon: number) => {
-      const margin = 8
-      const x =
-        ((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon)) *
-          (100 - 2 * margin) +
-        margin
-      const y =
-        90 -
-        ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) *
-          (80 - 2 * margin) -
-        margin
-      return { x, y }
-    },
-    [bounds]
+  const ProgressBar = ({ progress }: { progress: number }) => (
+    <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4 dark:bg-gray-700">
+      <div
+        className="bg-blue-600 h-2.5 rounded-full"
+        style={{ width: `${progress}%` }}
+      ></div>
+    </div>
   )
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">
-        chaspy ルネサンス東京 制覇マップ
-      </h1>
+      <h1 className="text-3xl font-bold mb-6">chaspy ルネサンス 制覇マップ</h1>
       {showAlert && (
         <div
           className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4"
@@ -125,17 +121,33 @@ export default function Home() {
         </div>
       )}
       <div className="bg-white shadow-md rounded-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-2">進捗状況</h2>
-        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4 dark:bg-gray-700">
-          <div
-            className="bg-blue-600 h-2.5 rounded-full"
-            style={{ width: `${progress}%` }}
-          ></div>
+        <h2 className="text-xl font-semibold mb-4">進捗状況</h2>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-lg font-medium mb-2">東京</h3>
+            <ProgressBar progress={tokyoProgress.progressPercentage} />
+            <p className="text-center">
+              {tokyoProgress.visitedCount} / {tokyoProgress.totalCount}{' '}
+              店舗訪問済み ({tokyoProgress.progressPercentage.toFixed(1)}%)
+            </p>
+          </div>
+          <div>
+            <h3 className="text-lg font-medium mb-2">埼玉</h3>
+            <ProgressBar progress={saitamaProgress.progressPercentage} />
+            <p className="text-center">
+              {saitamaProgress.visitedCount} / {saitamaProgress.totalCount}{' '}
+              店舗訪問済み ({saitamaProgress.progressPercentage.toFixed(1)}%)
+            </p>
+          </div>
+          <div>
+            <h3 className="text-lg font-medium mb-2">合計</h3>
+            <ProgressBar progress={totalProgress.progressPercentage} />
+            <p className="text-center">
+              {totalProgress.visitedCount} / {totalProgress.totalCount}{' '}
+              店舗訪問済み ({totalProgress.progressPercentage.toFixed(1)}%)
+            </p>
+          </div>
         </div>
-        <p className="text-center">
-          {visitedCount} / {locations.length} 店舗訪問済み (
-          {progress.toFixed(1)}%)
-        </p>
       </div>
       <div className="mb-4">
         <label htmlFor="filter" className="mr-2">
@@ -157,80 +169,20 @@ export default function Home() {
         </select>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="relative w-full" style={{ paddingBottom: '90%' }}>
-          <svg viewBox="0 0 100 90" className="absolute inset-0 w-full h-full">
-            <rect
-              x="0"
-              y="0"
-              width="100"
-              height="90"
-              fill="#f0f0f0"
-              stroke="#000"
-              strokeWidth="0.5"
-            />
-            {locations.map((location) => {
-              const { x, y } = toSVGCoords(location.lat, location.lon)
-              return (
-                <g key={location.name}>
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r={activeLocation === location.name ? '2.5' : '2'}
-                    fill={visited[location.name] ? '#4CAF50' : '#FF5722'}
-                    stroke={activeLocation === location.name ? '#000' : 'none'}
-                    strokeWidth="0.5"
-                    className="cursor-pointer transition-all duration-300 ease-in-out"
-                    onClick={() => toggleVisited(location.name)}
-                    onMouseEnter={() => setActiveLocation(location.name)}
-                    onMouseLeave={() => setActiveLocation(null)}
-                  />
-                  <text
-                    x={x}
-                    y={y - 3}
-                    fontSize="1.5"
-                    textAnchor="middle"
-                    fill={activeLocation === location.name ? '#000' : '#333'}
-                    className="pointer-events-none transition-all duration-300 ease-in-out"
-                    style={{
-                      fontWeight:
-                        activeLocation === location.name ? 'bold' : 'normal',
-                    }}
-                  >
-                    {location.name}
-                  </text>
-                </g>
-              )
-            })}
-          </svg>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {filteredLocations.map((location) => (
-            <button
-              key={location.name}
-              onClick={() => toggleVisited(location.name)}
-              className={`py-2 px-4 rounded transition-all duration-300 ease-in-out flex items-center justify-between
-                ${
-                  visited[location.name]
-                    ? 'bg-green-500 text-white'
-                    : 'bg-white text-gray-700 border border-gray-300'
-                }
-                ${
-                  activeLocation === location.name ? 'ring-2 ring-blue-500' : ''
-                }
-              `}
-              onMouseEnter={() => setActiveLocation(location.name)}
-              onMouseLeave={() => setActiveLocation(null)}
-            >
-              <span>{location.name}</span>
-              <span className="ml-2" aria-hidden="true">
-                {visited[location.name] ? '✓' : '○'}
-              </span>
-              <span className="sr-only">
-                {visited[location.name] ? '訪問済み' : '未訪問'}
-              </span>
-            </button>
-          ))}
-        </div>
+        <MapComponent
+          locations={tokyoLocations}
+          visited={visited}
+          toggleVisited={toggleVisited}
+          filterVisited={filterVisited}
+          title="東京"
+        />
+        <MapComponent
+          locations={saitamaLocations}
+          visited={visited}
+          toggleVisited={toggleVisited}
+          filterVisited={filterVisited}
+          title="埼玉"
+        />
       </div>
     </div>
   )
