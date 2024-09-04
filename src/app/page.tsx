@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { MapComponent } from './MapComponent'
 
 const tokyoLocations = [
   { name: '青砥24', lat: 35.747797, lon: 139.857486 },
@@ -32,7 +31,6 @@ const saitamaLocations = [
   { name: '蕨24', lat: 35.82305596578032, lon: 139.6932897637855 },
   { name: '吉川', lat: 35.88764707068135, lon: 139.84236030981833 },
   { name: '新所沢', lat: 35.81196958288052, lon: 139.4622548669497 },
-  { name: 'ふじみ野', lat: 35.856335208341235, lon: 139.52263084790678 },
   { name: '北朝霞24', lat: 35.81584457322143, lon: 139.5875918725021 },
   { name: '北戸田24', lat: 35.825488755301386, lon: 139.66065498283058 },
   { name: '春日部', lat: 35.983684568053036, lon: 139.75117300982268 },
@@ -49,10 +47,155 @@ const visitedLocations = [
   '富士見台24',
   '光が丘',
   '東久留米24',
-  '浦和24',
 ]
 
-export default function Home() {
+// 場所の型を定義します。
+type Location = {
+  name: string
+  lat: number
+  lon: number
+}
+
+// MapComponent の props の型を定義します。
+type MapComponentProps = {
+  locations: Location[]
+  visited: { [key: string]: boolean }
+  toggleVisited: (name: string) => void
+  filterVisited: 'all' | 'visited' | 'not-visited'
+  title: string
+}
+
+const MapComponent = ({
+  locations,
+  visited,
+  toggleVisited,
+  filterVisited,
+  title,
+}: MapComponentProps) => {
+  const [activeLocation, setActiveLocation] = useState<string | null>(null)
+
+  const filteredLocations = useMemo(() => {
+    return locations.filter((location) => {
+      if (filterVisited === 'all') return true
+      if (filterVisited === 'visited') return visited[location.name]
+      return !visited[location.name]
+    })
+  }, [locations, visited, filterVisited])
+
+  const bounds = useMemo(() => {
+    return locations.reduce(
+      (acc, loc) => ({
+        minLat: Math.min(acc.minLat, loc.lat),
+        maxLat: Math.max(acc.maxLat, loc.lat),
+        minLon: Math.min(acc.minLon, loc.lon),
+        maxLon: Math.max(acc.maxLon, loc.lon),
+      }),
+      {
+        minLat: Infinity,
+        maxLat: -Infinity,
+        minLon: Infinity,
+        maxLon: -Infinity,
+      }
+    )
+  }, [locations])
+
+  const toSVGCoords = useCallback(
+    (lat: number, lon: number) => {
+      const margin = 8
+      const x =
+        ((lon - bounds.minLon) / (bounds.maxLon - bounds.minLon)) *
+          (100 - 2 * margin) +
+        margin
+      const y =
+        90 -
+        ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) *
+          (80 - 2 * margin) -
+        margin
+      return { x, y }
+    },
+    [bounds]
+  )
+
+  return (
+    <div className="bg-white shadow-md rounded-lg p-6">
+      <h2 className="text-2xl font-bold mb-4">{title}</h2>
+      <div className="relative w-full" style={{ paddingBottom: '90%' }}>
+        <svg viewBox="0 0 100 90" className="absolute inset-0 w-full h-full">
+          <rect
+            x="0"
+            y="0"
+            width="100"
+            height="90"
+            fill="#f0f0f0"
+            stroke="#000"
+            strokeWidth="0.5"
+          />
+          {locations.map((location) => {
+            const { x, y } = toSVGCoords(location.lat, location.lon)
+            return (
+              <g key={location.name}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={activeLocation === location.name ? '2.5' : '2'}
+                  fill={visited[location.name] ? '#4CAF50' : '#FF5722'}
+                  stroke={activeLocation === location.name ? '#000' : 'none'}
+                  strokeWidth="0.5"
+                  className="cursor-pointer transition-all duration-300 ease-in-out"
+                  onClick={() => toggleVisited(location.name)}
+                  onMouseEnter={() => setActiveLocation(location.name)}
+                  onMouseLeave={() => setActiveLocation(null)}
+                />
+                <text
+                  x={x}
+                  y={y - 3}
+                  fontSize="1.5"
+                  textAnchor="middle"
+                  fill={activeLocation === location.name ? '#000' : '#333'}
+                  className="pointer-events-none transition-all duration-300 ease-in-out"
+                  style={{
+                    fontWeight:
+                      activeLocation === location.name ? 'bold' : 'normal',
+                  }}
+                >
+                  {location.name}
+                </text>
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+        {filteredLocations.map((location) => (
+          <button
+            key={location.name}
+            onClick={() => toggleVisited(location.name)}
+            className={`py-2 px-4 rounded transition-all duration-300 ease-in-out flex items-center justify-between
+              ${
+                visited[location.name]
+                  ? 'bg-green-500 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300'
+              }
+              ${activeLocation === location.name ? 'ring-2 ring-blue-500' : ''}
+            `}
+            onMouseEnter={() => setActiveLocation(location.name)}
+            onMouseLeave={() => setActiveLocation(null)}
+          >
+            <span>{location.name}</span>
+            <span className="ml-2" aria-hidden="true">
+              {visited[location.name] ? '✓' : '○'}
+            </span>
+            <span className="sr-only">
+              {visited[location.name] ? '訪問済み' : '未訪問'}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default function Component() {
   const [visited, setVisited] = useState<{ [key: string]: boolean }>(
     Object.fromEntries(
       [...tokyoLocations, ...saitamaLocations].map((loc) => [
