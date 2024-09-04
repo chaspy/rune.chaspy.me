@@ -33,6 +33,8 @@ const visitedLocations = [
   '仙川24',
   '石神井公園24',
   '富士見台24',
+  '光が丘',
+  '東久留米24',
 ]
 
 export default function Home() {
